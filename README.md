@@ -16,9 +16,9 @@ Structure of data: Array of objects (lanes) found at the bottom of the file.
   
 Another item to note: Car sizes and lane speeds are both randomly generated upon reaching a new level.
  
-Function of car animation: delete the end character of the car, and replace the front with a new car character
-  That goes for any updating item: player, score, and lives, but the car animation had to be optimized.
+Function of car animation: delete the end character of the car, and replace the front with a new car character.
+That goes for any updating item: player, score, and lives, but the car animation had to be optimized.
 
-Score: +10 per new line reached on a level, and +50 (and time remaining) if end of level is reached
+Score: +10 per new line reached on a level, and +50 (and time remaining) if end of level is reached.
 
 Since CUSP is an outdated environment, I've included my own gameplay:
