@@ -1,0 +1,678 @@
+	.EQU KBD_CNTL, 	$000
+	.EQU KBD_STAT,  	$000
+	.EQU KBD_DATA,  	$001
+	.EQU KBD_FLUSH, 	$40
+	.EQU TIM_CNTL,      	$030
+	.EQU TIM_STAT,      	$030
+	.EQU TIM_VALUE,     	$031
+	.EQU TIM_COUNT,     	$034
+         
+	.EQU INTERRUPT_ENA,           $80
+	.EQU RESET_READY_BIT,         $40
+	.EQU START_AFTER_LOAD,        $10
+	.EQU ENABLE_RESET_AND_START,  $D0
+	.EQU ENABLE_AND_RESET,        $C0
+
+	.EQU CRT_BUFFER,    	$100
+	.EQU BOTTOM_RIGHT,  	$313
+	.EQU CRT_XREG,      	$314
+	.EQU CRT_YREG,      	$315
+	.EQU CRT_CNTL,      	$316
+	.EQU CRT_DATA,      	$317
+	.EQU CRT_ROWS,      	$0E
+	.EQU CRT_COLS,      	$26
+          	.EQU CLEAR_DISPLAY, 	$01
+	.EQU HOME,	$04
+
+	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
+	.EQU GET_NUM,       	$E01
+	.EQU PUT_STR,       	$E05
+	.EQU PUT_NL,        	$E06
+	.EQU PUT_NUM2,      	$E07
+	.EQU PUT_CHR,       	$E08
+	
+	.EQU LEFT,	'j'
+	.EQU RIGHT,	'k'
+	.EQU UP,	'i'
+	.EQU DOWN,	'm'
+	.EQU PLAYER_CHR,	'@'
+	.EQU CAR_CHR,	$A4
+	.EQU BLANK,	' '
+	
+	lds#  	$E00
+	cie
+	jsr	makeGame
+	lda#	KEYISR
+	sta 	$FF8		; SET-UP KEYBOARD vector
+	lda#	ENABLE_AND_RESET		; enable input read
+	outb 	KBD_CNTL
+	lda   DELAY
+	outw  TIM_VALUE
+	lda#	TIMERISR
+	sta 	$FFB		; SET-UP TIMER ISR vector
+	lda#	ENABLE_RESET_AND_START	; load counter and start timer
+	outb 	TIM_CNTL         
+	sie
+
+MAINLOOP:	nop			; do nothing loop
+	jmp	MAINLOOP		; only serves to be interrupted
+
+;	void makeGame()
+;	function that prints out game display strings
+;	first frame of traffic, and
+makeGame:	bgn#	0
+	lda#	HOME	; moves cursor to top left
+	outb	CRT_CNTL
+	psh#	TIME_LEN
+	psh#	TIME_STR	; output timer prompt to screen
+	jsr	PUT_STR	
+	lda#	29	; move cursor
+	outb	CRT_XREG
+	psh#	SCORE_LEN
+	psh#	SCORE_STR	; output score to screen
+	jsr	PUT_STR
+	lda#	15	; move cursor to print in center
+	outb	CRT_XREG
+	psh#	FINISH_LEN
+	psh#	FINISH_STR	; output final lane
+	jsr	PUT_STR
+	lda#	7	; move cursor to middle (safe) lane
+	outb	CRT_YREG
+	lda#	14
+	outb	CRT_XREG
+	psh#	MID_LEN	; output middle lane
+	psh#	MIDDLE_STR
+	jsr	PUT_STR
+	lda#	13	; move cursor to center of start lane
+	outb	CRT_YREG
+	lda#	15
+	outb	CRT_XREG
+	psh#	START_LEN	; output start lane
+	psh#	START_STR
+	jsr	PUT_STR
+	lda#	14	; move cursor to left of last display line
+	outb	CRT_YREG
+	lda#	1	
+	outb	CRT_XREG
+	psh#	LEVEL_LEN	; output level number
+	psh#	LEVEL_STR
+	jsr	PUT_STR
+	lda#	27	; move cursor to print lives
+	outb	CRT_XREG
+	psh#	LIVES_LEN
+	psh#	LIVES_STR	; print lives
+	jsr	PUT_STR
+	ads#	14	; reset stack from str prints	
+	lda#	40	; move cursor off screen
+	outb	CRT_XREG
+	jsr	drawPlayer	; draw cursor
+	jsr	makeRoad	; make road
+	fin#	0
+	rtn
+
+;	void drawTraffic()
+;	draws next frame of traffic
+; 	if a lane's frame_count mod its refresh rate is 0, increment lane
+drawTraffic:	bgn#	0
+	ldx#	0
+	inc	FRAME_COUNT	; next frame
+	lda	FRAME_COUNT
+	cma#	120	; only 120 frames, reset at 120
+	jlt	nextLane
+	lda#	0
+	sta	FRAME_COUNT
+nextLane:	lda+	LANES
+	ada#	2	
+	sta	REFRESH_RATE	; mem addr of lane refresh rate
+	lda	FRAME_COUNT
+	mod*	REFRESH_RATE	; if frame count is divisible, increment lane
+	jne	dontUpdate
+continue:	lda+	LANES	; draw lane
+	psha		; preemtively push ACC
+	ada#	3
+	sta	REFRESH_RATE	; used as temp var for mem addr of direction
+	lda*	REFRESH_RATE	; get direction of traffic
+	cma#	0	; go left
+	jeq	goLeft
+	jsr	moveLaneRight	; otherwise go right
+	jmp	clearStack
+goLeft:	jsr 	moveLaneLeft	
+clearStack:	ads#	1
+dontUpdate:	aoc#	9	; all lanes drawn
+	jlt	nextLane
+	fin#	0
+	rtn
+
+;	void makeRoad()
+;	fills all lanes with cars and draws them
+makeRoad:	bgn#	0
+	ldx#	0
+makeNext:	lda+	LANES	; loop through all lanes
+	psha		
+	jsr	makeLane	; uses same LANE addr
+	jsr	drawLane
+	ads#	1
+	aoc#	9	; all lanes made
+	jlt	makeNext
+	fin#	0
+	rtn
+
+; 	void makeLane(var LANE#)
+; 	loads lane with a random frame offset, refresh rate, 
+; 	direction of travel, and 6 randomly generated cars
+	.equ	lane_arr, 2
+
+makeLane:	bgn#	0
+	psha
+    	pshx
+	ldx#	1	; init registers
+	psh#	30	; get random frame offset (1->31 ports)
+	jsr	random
+	ada#	1
+	sta& 	!lane_arr
+	adx#	1
+	psh#	6	; get random refresh rate (1->5 frames)
+	jsr	random
+	ada#	1	
+	sta& 	!lane_arr
+	adx#	1
+	psh# 	1	; get random direction 
+	jsr	random	; 0 -> left	
+	sta& 	!lane_arr	; 1 -> right
+	ads#	3	; clear stack of 3 calls to random
+makeCars:	adx# 	1	
+	psh	MAX_CAR_SIZE	; get random car length (1->1+MAX_CAR_SIZE)
+    	jsr	random	
+	ads#	1
+	ada#	1
+	sta&  !lane_arr
+	nega		; get gap length (standard is 6)
+	ada#	6	
+	aoc#	15	
+	jeq	laneMade	; finished
+	cmx#	9	; gap of 3rd and last car are 7
+	jne	storeGap
+	ada#	1
+storeGap:	sta& 	!lane_arr
+	jmp	makeCars	
+laneMade:	popx
+	popa
+    	fin#	0
+    	rtn
+
+; 	void drawLane(var LANE#)
+; 	draws lane with cars at a frame offset
+drawLane:	bgn#	0
+	psha
+	pshx	
+	lda* 	!lane_arr	; save starting port
+	sta	START_PORT
+	inc 	!lane_arr	
+	ldx* 	!lane_arr	; store frame offset into XR
+	inc 	!lane_arr	; change array index to car data
+	inc 	!lane_arr	; increments are faster
+drawCars:	inc 	!lane_arr	; begin drawing cars
+	lda* 	!lane_arr	; get length of car
+	sta	CAR_LENGTH	
+	lda#	CAR_CHR
+drawCar:	outb&	START_PORT	; draw needed number of CAR_CHRs
+	aoc#	38	; print from beginning of lane
+	jlt	resumeDraw	; if overflow
+	sbx#	38
+resumeDraw:	dec	CAR_LENGTH
+	jne	drawCar	
+	dec	CARS_LEFT	; any cars left?
+	jeq	endDraw
+	inc 	!lane_arr	; offset XR for gap
+	adx* 	!lane_arr	
+	cmx#	38
+	jlt	drawCars
+	sbx#	38		
+	jmp	drawCars
+endDraw:	lda#	6	; reset cars_left
+	sta	CARS_LEFT
+	popx		; reset registers
+	popa
+	fin#	0
+	rtn
+
+;	void moveLaneLeft(var LANE#)
+;	decrements frame offset, and calls to redraw lane
+moveLaneLeft:	bgn#	0
+	pshx		; save registers
+	lda* 	!lane_arr	; save starting port
+	sta	START_PORT
+	inc 	!lane_arr	
+	ldx* 	!lane_arr	; store frame offset into XR
+	soj	storeDec	; decrement offset + check overflow	
+	adx#	38	; frame offset = -1 => 37
+storeDec:	stx* 	!lane_arr	; store new frame offset
+	lda 	!lane_arr
+	ada#	2	; update the lane display
+	psha		; appropriate starting address
+	psh#	CAR_CHR	; char to print in front of car
+	psh#	BLANK	; char to print in back
+	jsr	updateLane
+	ads# 	3
+	popx		; reset registers
+	fin#	0
+	rtn
+
+;	void moveLaneRight(var LANE#)
+;	increments frame offset, and calls to redraw lane
+moveLaneRight:	bgn#	0
+	pshx		; store registers
+	lda* 	!lane_arr	; save starting port
+	sta	START_PORT
+	inc 	!lane_arr	
+	ldx* 	!lane_arr	; store frame offset into XR
+	txa		; increment offset
+	ada#	1	
+	cma#	38	; check overflow
+	jlt	storeInc
+	sba# 	38	; frame offset = 38 => 0
+storeInc:	sta* 	!lane_arr	; store new frame offset
+	lda 	!lane_arr
+	ada#	2	; update the lane display
+	psha		; appropriate starting address
+	psh#	BLANK	; char to print in front of car
+	psh#	CAR_CHR	; char to print in back
+	jsr	updateLane
+	ads#	3
+	popx		; reset registers
+	fin#	0 
+	rtn
+
+; 	void	updateLane(var LANE#'s car array, first, second)
+;	redraws lane from by a 1 frame shift stored in frame offset
+;	prints first_chr in front of car, and second_chr behind car
+	.equ	car_arr, 4
+	.equ	first_chr, 3
+	.equ	second_chr, 2
+updateLane:	bgn#	0	; assumes XR has frame offset
+updateCars:	inc 	!car_arr	; begin drawing cars
+	lda* 	!car_arr	; get length of car
+	sta	CAR_LENGTH	
+	lda 	!first_chr
+	outb&	START_PORT	; draw front of car
+	adx	CAR_LENGTH	
+	cmx#	38	; check overflow
+	jlt	noReset
+	sbx#	38
+noReset:	lda 	!second_chr	; clear end of car
+	outb&	START_PORT
+	dec	CARS_LEFT	; any cars left?
+	jeq	endUpdate	; referenced in drawLane
+	inc 	!car_arr	; get next car position
+	adx* 	!car_arr
+	cmx#	38
+	jlt	updateCars
+	sbx#	38	
+	jmp	updateCars
+endUpdate:	lda#	6	; reset cars_left
+	sta	CARS_LEFT
+	fin#	0
+	rtn
+
+;	void drawPlayer()
+;	draws player at PLAYER_PORT
+drawPlayer:	bgn#	0
+	psha		; save registers
+	pshx 
+	inb*	PLAYER_PORT	; see if player ran into car
+	cma#	CAR_CHR
+	jeq	startReset	; reset level	
+alive:	lda#	PLAYER_CHR	; draw player
+	outb*	PLAYER_PORT
+	jmp	endPlayerDraw
+startReset:	jsr	resetLevel
+endPlayerDraw:	popx
+	popa		; restore registers
+	fin#	0	
+	rtn
+
+;	void resetLevel()
+;	Increments corresponding game variables after player failed to
+;	complete a level
+resetLevel:	bgn#	0
+	psha
+	dec	LIVES	; Decrements lives, if 0 game ends
+	jlt	ENDGAME
+	lda#	13
+	sta	FURTHEST_LANE	; reset furthest lane player reached
+	lda#	5
+	sta	PLAY_DELAY	; reset PLAY_DELAY
+	lda#	33
+	ada	LIVES
+	outb	CRT_XREG	; remove character representing a life
+	lda#	14
+	outb	CRT_YREG
+	lda#	BLANK
+	outb	CRT_DATA	; draw blank (one less char)
+	lda#	40	; move cursor off screen
+	outb	CRT_XREG
+	lda	TIME_COUNT	; check if time caused function call (print blank)
+	cma#	0
+	jgt	setBlank	; if time != 0, reset caused from collision
+	lda#	BLANK	
+	outb*	PLAYER_PORT	; clear player port (car)
+	jmp	resetCount
+setBlank:	lda#	CAR_CHR	; clear player port (time)
+	outb* PLAYER_PORT
+resetCount:	lda#	31	; reset time_count to 30
+	sta	TIME_COUNT
+	lda#	730	; reset mapped/non-mapped player position
+	sta	PLAYER_PORT
+	lda#	19
+	sta	PLAYERX
+	lda#	13
+	sta	PLAYERY
+	lda#	BLANK	; loads last char with blank
+	sta	LAST_CHR
+	jsr	drawPlayer	; redraw player
+	popa
+	fin#	0
+	rtn
+
+;	void nextLevel()
+;	Generates a more difficult highway to traverse and increases the speed of cars
+;	Also updates the score (+= time remaining)
+nextLevel:	bgn#	0
+	psha
+	lda#	13
+	sta	FURTHEST_LANE	; reset furthest lane player reached
+	lda#	5
+	sta	PLAY_DELAY	; reset PLAY_DELAY
+	lda	DELAY	; decrease game delay
+	sba	DELAY_OFFSET
+	cma	MIN_DELAY	; minimum delay
+	jle	incLevel
+	sta	DELAY	; reset counter of timer
+	outw  TIM_VALUE
+incLevel:	inc	LEVEL	; increment level
+	lda#	14
+	outb	CRT_YREG	
+	lda#	7
+	outb	CRT_XREG
+	lda	LEVEL
+	jsr	PUT_NUM2	; display new level
+	lda	SCORE	; score += time remaining
+	ada	TIME_COUNT
+	ada#	50	; score += 50 (completing level)
+	sta	SCORE	
+	lda#	1
+	outb	CRT_YREG
+	lda#	35	
+	outb	CRT_XREG
+	lda	SCORE
+	jsr	PUT_NUM2	; print score
+	lda#	40	; move cursor off screen
+	outb	CRT_XREG
+	lda#	31	; reset time_count to 30
+	sta	TIME_COUNT
+	lda#	730	; reset mapped/non-mapped player position
+	sta	PLAYER_PORT
+	lda#	19
+	sta	PLAYERX
+	lda#	13
+	sta	PLAYERY
+	lda#	BLANK	; reset last_chr player was over to be blank
+	sta	LAST_CHR
+	jsr	drawPlayer	; redraw player
+	jsr 	clearTraffic	; resets traffic
+	lda	MAX_CAR_SIZE	; increment max car size
+	ada#	1
+	cma#	4
+	jgt	sizeCapped
+	inc	MAX_CAR_SIZE
+sizeCapped:	jsr	makeRoad	; new road
+	popa
+	fin#	0
+	rtn
+
+;	void clearTraffic()
+;	clears all characters from every lane
+clearTraffic:	bgn#	0
+	pshx
+	ldx#	0
+clearNext:	lda+	LANES	; loop through all lanes
+	sta	START_PORT	; temp var for start port
+	lda*	START_PORT	; MEM[MEM[LANES + XR]] = start port
+	sta	START_PORT		
+	jsr	clearLane	; clear lane	
+	aoc#	9	; all lanes made
+	jlt	clearNext
+	popx
+	fin#	0
+	rtn
+
+; 	void clearLane(int port)
+;	prints 38 blank characters from starting port
+clearLane:	bgn#	0
+	pshx
+	ldx#	0
+	lda#	BLANK
+clearPort:	outb& START_PORT
+	aoc#	38
+	jlt	clearPort
+	popx
+	fin#	0
+	rtn
+
+;	int random(int max) leaves result in accumulator!
+	.equ	random_max, 2
+
+random:	bgn#	0
+	lda	seed
+	mul#	2779
+	ada#	1997
+    	mod#	2048
+    	sta	seed
+    	inc 	!random_max
+    	mod 	!random_max
+    	fin#	0
+	rtn
+seed:	.word	8
+
+; INTERRUPT ROUTINES
+TIMERISR: 	psha
+	lda	PLAY_DELAY	; prevents game from updating
+	cma#	2
+	jne	checkZero	; removes crossy road string
+	lda#	7	; move cursor to middle (safe) lane
+	outb	CRT_YREG
+	lda#	14
+	outb	CRT_XREG
+	psh#	RESET_LEN	; output reset string
+	psh#	RESET_STR
+	jsr	PUT_STR
+	ads#	2
+	lda#	40	; remove cursor from screen
+	outb	CRT_XREG
+checkZero:	cma#	0
+	jeq	noDelay	
+	dec	PLAY_DELAY
+	jmp	resetTimer
+noDelay:	lda	TIME_INC	; no delay
+	sba	DELAY
+	jgt	saveTime	; check if TIME_INC < 0
+	ada	RESET_TIME	; resets TIME_INC
+	sta	TIME_INC
+	dec	TIME_COUNT	; dec TIME_COUNT
+	jno	validTime	; TIME_COUNT = -1, reset level
+	jsr	resetLevel	
+	jmp	resetTimer
+validTime:	lda#	1	; print new time
+	outb	CRT_YREG	; move cursor
+	lda#	6	
+	outb 	CRT_XREG
+	lda	TIME_COUNT	
+	jsr	PUT_NUM2	; blank at end of time, so when
+	lda#	BLANK	; time < 10, there is no extra 0
+	outb	CRT_DATA		
+	lda#	40
+	outb	CRT_XREG	; move cursor off screen
+	jmp	resetTimer
+saveTime:	sta	TIME_INC
+	jsr 	drawTraffic	; draw traffic every interrupt
+	jsr	drawPlayer	; draw cursor - detects collision	
+resetTimer:	lda#	ENABLE_AND_RESET	; enable timer, reset count
+          	outb  TIM_CNTL
+	popa
+          	irtn
+		
+KEYISR:	psha
+	lda	PLAY_DELAY	; prevents cursor from updating
+	cma#	0
+	jne	resetKey	; only flushes interrupt
+	lda#	0
+	outb	KBD_CNTL	; stop interrupts/no operation
+	inb	KBD_DATA
+	cma#	LEFT
+	jne	rightKey
+	lda	PLAYERX	; LEFT KEY
+	cma#	1	; reached left wall?
+	jeq	resetKey
+	lda	LAST_CHR	; clear player
+	outb*	PLAYER_PORT
+	dec	PLAYERX	; decrement PORT and PLAYERX
+	dec	PLAYER_PORT
+	inb*	PLAYER_PORT	; store char overwritten
+	sta	LAST_CHR
+	jsr	drawPlayer	; draw new position
+	jmp 	resetKey
+rightKey:	cma#	RIGHT
+	jne	upKey
+	lda	PLAYERX	; RIGHT KEY
+	cma#	38	; reached right wall?
+	jeq	resetKey
+	lda	LAST_CHR	; clear player
+	outb*	PLAYER_PORT
+	inc	PLAYERX	; increment PORT and PLAYERX
+	inc	PLAYER_PORT
+	inb*	PLAYER_PORT	; store char overwritten
+	sta	LAST_CHR
+	jsr	drawPlayer	; draw new position
+	jmp	resetKey
+upKey:	cma#	UP
+	jne	downKey
+	lda	PLAYERY	; UP KEY
+	cma#	3	; reached end lane? go to NEXT LEVEL
+	jgt	notNEXT
+	jsr	nextLevel
+	jmp	resetKey
+notNEXT:	lda	LAST_CHR	; clear player
+	outb*	PLAYER_PORT
+	dec	PLAYERY	; decrement PORT and PLAYERY
+	lda#	38
+	nega
+	ada	PLAYER_PORT
+	sta	PLAYER_PORT
+	inb*	PLAYER_PORT	
+	sta	LAST_CHR	; store char overwritten
+	lda	PLAYERY
+	cma	FURTHEST_LANE
+	jge	noAddScore
+	dec	FURTHEST_LANE
+	lda#	10	; add 10 to score for reaching new line
+	ada	SCORE
+	sta	SCORE
+	lda#	1
+	outb	CRT_YREG
+	lda#	35	
+	outb	CRT_XREG
+	lda	SCORE
+	jsr	PUT_NUM2	; display score
+	lda#	40
+	outb	CRT_XREG	; move cursor off screen
+noAddScore:	jsr	drawPlayer	; draw new position
+	jmp	resetKey
+downKey:	cma#	DOWN
+	jne	resetKey
+	lda	PLAYERY	; DOWN KEY
+	cma#	13	; at start lane?
+	jeq	resetKey
+	lda	LAST_CHR	; clear player
+	outb*	PLAYER_PORT
+	inc	PLAYERY	; increment PORT and PLAYERY
+	lda#	38	
+	ada	PLAYER_PORT
+	sta	PLAYER_PORT
+	inb*	PLAYER_PORT	; store char overwritten
+	sta	LAST_CHR
+	jsr	drawPlayer	; draw new position
+resetKey:	lda#	KBD_FLUSH	; do not want a buffer
+	outb	KBD_CNTL
+	lda#	INTERRUPT_ENA	; enable interrups
+	outb	KBD_CNTL
+	popa
+	irtn
+
+ENDGAME:	HLT
+
+; TIMER VARIABLES
+PLAY_DELAY:	.word 5
+RESET_TIME:	.word	12000
+DELAY:	.word	2000	; delay of timer before reload
+DELAY_OFFSET:	.word	500	; amount delay decreases per level
+MIN_DELAY:	.word 0	; min delay
+TIME_INC:	.word	12000	; count of timer before incrementing the time
+
+; PLAYER VARIABLES
+PLAYERX:	.word	19	; non-mapped cursor location of player
+PLAYERY:	.word 13
+PLAYER_PORT:	.word	730	; mapped location of player
+LAST_CHR:	.word	BLANK	; last character player was over
+
+; GAME VARIABLES
+FURTHEST_LANE:	.word	13	; furthest lane a player reached (adds to score)
+LEVEL:	.word	1
+TIME_COUNT:	.word	30
+SCORE:	.word 0
+LIVES:	.word	5
+MAX_CAR_SIZE:	.word	1	; size is random (1->1+MAX_SIZE)
+
+; TEMP VARIABLES
+REFRESH_RATE:	.word 0	; mem addr of lane refresh rate
+FRAME_COUNT:	.word 15	; frame count of game
+START_PORT:	.word 0	; port address of lane start
+CARS_LEFT:	.word 6	; # of cars left to draw
+CAR_LENGTH:	.word 0	; length of car
+
+; ALL THE STRINGS PRINTED TO SCREEN
+TIME_STR:	.char 'TIME:30', TIME_LEN		; displays initial time
+SCORE_STR:	.char	'SCORE:0   ', SCORE_LEN	; displays initial score
+FINISH_STR:	.char	'--FINISH--', FINISH_LEN	; writes to end lane
+MIDDLE_STR:	.char	'CROSSY ROADS',MID_LEN	; writes to middle lane
+START_STR:	.char	'--ST RT!--', START_LEN	; writes to start lane
+LEVEL_STR:	.char	'LEVEL:1', LEVEL_LEN	; displays initial level
+LIVES_STR:	.char	'LIVES:\$AE\$AE\$AE\$AE\$AE',LIVES_LEN ; displays initial lives
+RESET_STR:	.char	'            ', RESET_LEN; used to remove crossy roads string
+
+LANE1:	.word	$14C	; LANE DATA STRUCTURE
+	.blkw 14, 0	; [0] => start port address	
+LANE2:	.word	$172	; [1] => frame offset 
+	.blkw 14, 0	; [2] => refresh rate
+LANE3:	.word	$198	; [3] => direction
+	.blkw 14, 0	;     if [3]>0 lane goes right, and left if otherwise 
+LANE4:	.word	$1BE	; [4] => car 1 size
+	.blkw 14, 0	; [5] => car 1 gap
+LANE5:	.word	$20A	; [6] => car 2 size
+	.blkw 14, 0	; [7] => car 2 gap
+LANE6:	.word	$230	; ...
+	.blkw 14, 0	; [14]=> car 6 size
+LANE7:	.word	$256	; 
+	.blkw 14, 0	; car 6 gap is implicit: 38 - sum([3]...[13])
+LANE8:	.word	$27C	; car size + car gap = 6 or 7
+	.blkw	14, 0
+LANE9:	.word	$2A2
+	.blkw	14, 0
+LANES:	.word	LANE1	; LANES ARRAY with LANE addresses
+	.word	LANE2
+	.word	LANE3
+	.word	LANE4
+	.word	LANE5
+	.word	LANE6
+	.word	LANE7
+	.word	LANE8
+	.word	LANE9

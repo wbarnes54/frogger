@@ -1,0 +1,758 @@
+LINE ADDR CONTENTS SOURCE LINE
+  1.              	.EQU KBD_CNTL, 	$000
+  2.              	.EQU KBD_STAT,  	$000
+  3.              	.EQU KBD_DATA,  	$001
+  4.              	.EQU KBD_FLUSH, 	$40
+  5.              	.EQU TIM_CNTL,      	$030
+  6.              	.EQU TIM_STAT,      	$030
+  7.              	.EQU TIM_VALUE,     	$031
+  8.              	.EQU TIM_COUNT,     	$034
+  9.                       
+ 10.              	.EQU INTERRUPT_ENA,           $80
+ 11.              	.EQU RESET_READY_BIT,         $40
+ 12.              	.EQU START_AFTER_LOAD,        $10
+ 13.              	.EQU ENABLE_RESET_AND_START,  $D0
+ 14.              	.EQU ENABLE_AND_RESET,        $C0
+ 15.              
+ 16.              	.EQU CRT_BUFFER,    	$100
+ 17.              	.EQU BOTTOM_RIGHT,  	$313
+ 18.              	.EQU CRT_XREG,      	$314
+ 19.              	.EQU CRT_YREG,      	$315
+ 20.              	.EQU CRT_CNTL,      	$316
+ 21.              	.EQU CRT_DATA,      	$317
+ 22.              	.EQU CRT_ROWS,      	$0E
+ 23.              	.EQU CRT_COLS,      	$26
+ 24.                        	.EQU CLEAR_DISPLAY, 	$01
+ 25.              	.EQU HOME,	$04
+ 26.              
+ 27.              	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
+ 28.              	.EQU GET_NUM,       	$E01
+ 29.              	.EQU PUT_STR,       	$E05
+ 30.              	.EQU PUT_NL,        	$E06
+ 31.              	.EQU PUT_NUM2,      	$E07
+ 32.              	.EQU PUT_CHR,       	$E08
+ 33.              	
+ 34.              	.EQU LEFT,	'j'
+ 35.              	.EQU RIGHT,	'k'
+ 36.              	.EQU UP,	'i'
+ 37.              	.EQU DOWN,	'm'
+ 38.              	.EQU PLAYER_CHR,	'@'
+ 39.              	.EQU CAR_CHR,	$A4
+ 40.              	.EQU BLANK,	' '
+ 41.              	
+ 42.  000 020E00  	lds#  	$E00
+ 43.  001 FFF033  	cie
+ 44.  002 412010  	jsr	makeGame
+ 45.  003 0001A8  	lda#	KEYISR
+ 46.  004 042FF8  	sta 	$FF8		; SET-UP KEYBOARD vector
+ 47.  005 0000C0  	lda#	ENABLE_AND_RESET		; enable input read
+ 48.  006 712000  	outb 	KBD_CNTL
+ 49.  007 002201  	lda   DELAY
+ 50.  008 732031  	outw  TIM_VALUE
+ 51.  009 00017B  	lda#	TIMERISR
+ 52.  00A 042FFB  	sta 	$FFB		; SET-UP TIMER ISR vector
+ 53.  00B 0000D0  	lda#	ENABLE_RESET_AND_START	; load counter and start timer
+ 54.  00C 712030  	outb 	TIM_CNTL         
+ 55.  00D FFF032  	sie
+ 56.              
+ 57.  00E FFF038  MAINLOOP:	nop			; do nothing loop
+ 58.  00F 40200E  	jmp	MAINLOOP		; only serves to be interrupted
+ 59.              
+ 60.              ;	void makeGame()
+ 61.              ;	function that prints out game display strings
+ 62.              ;	first frame of traffic, and
+ 63.  010 680000  makeGame:	bgn#	0
+ 64.  011 000004  	lda#	HOME	; moves cursor to top left
+ 65.  012 712316  	outb	CRT_CNTL
+ 66.  013 080007  	psh#	TIME_LEN
+ 67.  014 080214  	psh#	TIME_STR	; output timer prompt to screen
+ 68.  015 412E05  	jsr	PUT_STR	
+ 69.  016 00001D  	lda#	29	; move cursor
+ 70.  017 712314  	outb	CRT_XREG
+ 71.  018 08000A  	psh#	SCORE_LEN
+ 72.  019 080217  	psh#	SCORE_STR	; output score to screen
+ 73.  01A 412E05  	jsr	PUT_STR
+ 74.  01B 00000F  	lda#	15	; move cursor to print in center
+ 75.  01C 712314  	outb	CRT_XREG
+ 76.  01D 08000A  	psh#	FINISH_LEN
+ 77.  01E 08021B  	psh#	FINISH_STR	; output final lane
+ 78.  01F 412E05  	jsr	PUT_STR
+ 79.  020 000007  	lda#	7	; move cursor to middle (safe) lane
+ 80.  021 712315  	outb	CRT_YREG
+ 81.  022 00000E  	lda#	14
+ 82.  023 712314  	outb	CRT_XREG
+ 83.  024 08000C  	psh#	MID_LEN	; output middle lane
+ 84.  025 08021F  	psh#	MIDDLE_STR
+ 85.  026 412E05  	jsr	PUT_STR
+ 86.  027 00000D  	lda#	13	; move cursor to center of start lane
+ 87.  028 712315  	outb	CRT_YREG
+ 88.  029 00000F  	lda#	15
+ 89.  02A 712314  	outb	CRT_XREG
+ 90.  02B 08000A  	psh#	START_LEN	; output start lane
+ 91.  02C 080223  	psh#	START_STR
+ 92.  02D 412E05  	jsr	PUT_STR
+ 93.  02E 00000E  	lda#	14	; move cursor to left of last display line
+ 94.  02F 712315  	outb	CRT_YREG
+ 95.  030 000001  	lda#	1	
+ 96.  031 712314  	outb	CRT_XREG
+ 97.  032 080007  	psh#	LEVEL_LEN	; output level number
+ 98.  033 080227  	psh#	LEVEL_STR
+ 99.  034 412E05  	jsr	PUT_STR
+100.  035 00001B  	lda#	27	; move cursor to print lives
+101.  036 712314  	outb	CRT_XREG
+102.  037 08000B  	psh#	LIVES_LEN
+103.  038 08022A  	psh#	LIVES_STR	; print lives
+104.  039 412E05  	jsr	PUT_STR
+105.  03A 12000E  	ads#	14	; reset stack from str prints	
+106.  03B 000028  	lda#	40	; move cursor off screen
+107.  03C 712314  	outb	CRT_XREG
+108.  03D 4120F0  	jsr	drawPlayer	; draw cursor
+109.  03E 41205E  	jsr	makeRoad	; make road
+110.  03F 690000  	fin#	0
+111.  040 FFF040  	rtn
+112.              
+113.              ;	void drawTraffic()
+114.              ;	draws next frame of traffic
+115.              ; 	if a lane's frame_count mod its refresh rate is 0, increment lane
+116.  041 680000  drawTraffic:	bgn#	0
+117.  042 010000  	ldx#	0
+118.  043 1B2210  	inc	FRAME_COUNT	; next frame
+119.  044 002210  	lda	FRAME_COUNT
+120.  045 200078  	cma#	120	; only 120 frames, reset at 120
+121.  046 4A2049  	jlt	nextLane
+122.  047 000000  	lda#	0
+123.  048 042210  	sta	FRAME_COUNT
+124.  049 0042B9  nextLane:	lda+	LANES
+125.  04A 100002  	ada#	2	
+126.  04B 04220F  	sta	REFRESH_RATE	; mem addr of lane refresh rate
+127.  04C 002210  	lda	FRAME_COUNT
+128.  04D 1A620F  	mod*	REFRESH_RATE	; if frame count is divisible, increment lane
+129.  04E 49205A  	jne	dontUpdate
+130.  04F 0042B9  continue:	lda+	LANES	; draw lane
+131.  050 FFF010  	psha		; preemtively push ACC
+132.  051 100003  	ada#	3
+133.  052 04220F  	sta	REFRESH_RATE	; used as temp var for mem addr of direction
+134.  053 00620F  	lda*	REFRESH_RATE	; get direction of traffic
+135.  054 200000  	cma#	0	; go left
+136.  055 482058  	jeq	goLeft
+137.  056 4120C2  	jsr	moveLaneRight	; otherwise go right
+138.  057 402059  	jmp	clearStack
+139.  058 4120AF  goLeft:	jsr 	moveLaneLeft	
+140.  059 120001  clearStack:	ads#	1
+141.  05A 600009  dontUpdate:	aoc#	9	; all lanes drawn
+142.  05B 4A2049  	jlt	nextLane
+143.  05C 690000  	fin#	0
+144.  05D FFF040  	rtn
+145.              
+146.              ;	void makeRoad()
+147.              ;	fills all lanes with cars and draws them
+148.  05E 680000  makeRoad:	bgn#	0
+149.  05F 010000  	ldx#	0
+150.  060 0042B9  makeNext:	lda+	LANES	; loop through all lanes
+151.  061 FFF010  	psha		
+152.  062 412069  	jsr	makeLane	; uses same LANE addr
+153.  063 41208E  	jsr	drawLane
+154.  064 120001  	ads#	1
+155.  065 600009  	aoc#	9	; all lanes made
+156.  066 4A2060  	jlt	makeNext
+157.  067 690000  	fin#	0
+158.  068 FFF040  	rtn
+159.              
+160.              ; 	void makeLane(var LANE#)
+161.              ; 	loads lane with a random frame offset, refresh rate, 
+162.              ; 	direction of travel, and 6 randomly generated cars
+163.              	.equ	lane_arr, 2
+164.              
+165.  069 680000  makeLane:	bgn#	0
+166.  06A FFF010  	psha
+167.  06B FFF011      	pshx
+168.  06C 010001  	ldx#	1	; init registers
+169.  06D 08001E  	psh#	30	; get random frame offset (1->31 ports)
+170.  06E 412170  	jsr	random
+171.  06F 100001  	ada#	1
+172.  070 049002  	sta& 	!lane_arr
+173.  071 110001  	adx#	1
+174.  072 080006  	psh#	6	; get random refresh rate (1->5 frames)
+175.  073 412170  	jsr	random
+176.  074 100001  	ada#	1	
+177.  075 049002  	sta& 	!lane_arr
+178.  076 110001  	adx#	1
+179.  077 080001  	psh# 	1	; get random direction 
+180.  078 412170  	jsr	random	; 0 -> left	
+181.  079 049002  	sta& 	!lane_arr	; 1 -> right
+182.  07A 120003  	ads#	3	; clear stack of 3 calls to random
+183.  07B 110001  makeCars:	adx# 	1	
+184.  07C 08220E  	psh	MAX_CAR_SIZE	; get random car length (1->1+MAX_CAR_SIZE)
+185.  07D 412170      	jsr	random	
+186.  07E 120001  	ads#	1
+187.  07F 100001  	ada#	1
+188.  080 049002  	sta&  !lane_arr
+189.  081 FFF020  	nega		; get gap length (standard is 6)
+190.  082 100006  	ada#	6	
+191.  083 60000F  	aoc#	15	
+192.  084 48208A  	jeq	laneMade	; finished
+193.  085 210009  	cmx#	9	; gap of 3rd and last car are 7
+194.  086 492088  	jne	storeGap
+195.  087 100001  	ada#	1
+196.  088 049002  storeGap:	sta& 	!lane_arr
+197.  089 40207B  	jmp	makeCars	
+198.  08A FFF014  laneMade:	popx
+199.  08B FFF013  	popa
+200.  08C 690000      	fin#	0
+201.  08D FFF040      	rtn
+202.              
+203.              ; 	void drawLane(var LANE#)
+204.              ; 	draws lane with cars at a frame offset
+205.  08E 680000  drawLane:	bgn#	0
+206.  08F FFF010  	psha
+207.  090 FFF011  	pshx	
+208.  091 007002  	lda* 	!lane_arr	; save starting port
+209.  092 042211  	sta	START_PORT
+210.  093 1B3002  	inc 	!lane_arr	
+211.  094 017002  	ldx* 	!lane_arr	; store frame offset into XR
+212.  095 1B3002  	inc 	!lane_arr	; change array index to car data
+213.  096 1B3002  	inc 	!lane_arr	; increments are faster
+214.  097 1B3002  drawCars:	inc 	!lane_arr	; begin drawing cars
+215.  098 007002  	lda* 	!lane_arr	; get length of car
+216.  099 042213  	sta	CAR_LENGTH	
+217.  09A 0000A4  	lda#	CAR_CHR
+218.  09B 718211  drawCar:	outb&	START_PORT	; draw needed number of CAR_CHRs
+219.  09C 600026  	aoc#	38	; print from beginning of lane
+220.  09D 4A209F  	jlt	resumeDraw	; if overflow
+221.  09E 150026  	sbx#	38
+222.  09F 1C2213  resumeDraw:	dec	CAR_LENGTH
+223.  0A0 49209B  	jne	drawCar	
+224.  0A1 1C2212  	dec	CARS_LEFT	; any cars left?
+225.  0A2 4820A9  	jeq	endDraw
+226.  0A3 1B3002  	inc 	!lane_arr	; offset XR for gap
+227.  0A4 117002  	adx* 	!lane_arr	
+228.  0A5 210026  	cmx#	38
+229.  0A6 4A2097  	jlt	drawCars
+230.  0A7 150026  	sbx#	38		
+231.  0A8 402097  	jmp	drawCars
+232.  0A9 000006  endDraw:	lda#	6	; reset cars_left
+233.  0AA 042212  	sta	CARS_LEFT
+234.  0AB FFF014  	popx		; reset registers
+235.  0AC FFF013  	popa
+236.  0AD 690000  	fin#	0
+237.  0AE FFF040  	rtn
+238.              
+239.              ;	void moveLaneLeft(var LANE#)
+240.              ;	decrements frame offset, and calls to redraw lane
+241.  0AF 680000  moveLaneLeft:	bgn#	0
+242.  0B0 FFF011  	pshx		; save registers
+243.  0B1 007002  	lda* 	!lane_arr	; save starting port
+244.  0B2 042211  	sta	START_PORT
+245.  0B3 1B3002  	inc 	!lane_arr	
+246.  0B4 017002  	ldx* 	!lane_arr	; store frame offset into XR
+247.  0B5 6120B7  	soj	storeDec	; decrement offset + check overflow	
+248.  0B6 110026  	adx#	38	; frame offset = -1 => 37
+249.  0B7 057002  storeDec:	stx* 	!lane_arr	; store new frame offset
+250.  0B8 003002  	lda 	!lane_arr
+251.  0B9 100002  	ada#	2	; update the lane display
+252.  0BA FFF010  	psha		; appropriate starting address
+253.  0BB 0800A4  	psh#	CAR_CHR	; char to print in front of car
+254.  0BC 080020  	psh#	BLANK	; char to print in back
+255.  0BD 4120D8  	jsr	updateLane
+256.  0BE 120003  	ads# 	3
+257.  0BF FFF014  	popx		; reset registers
+258.  0C0 690000  	fin#	0
+259.  0C1 FFF040  	rtn
+260.              
+261.              ;	void moveLaneRight(var LANE#)
+262.              ;	increments frame offset, and calls to redraw lane
+263.  0C2 680000  moveLaneRight:	bgn#	0
+264.  0C3 FFF011  	pshx		; store registers
+265.  0C4 007002  	lda* 	!lane_arr	; save starting port
+266.  0C5 042211  	sta	START_PORT
+267.  0C6 1B3002  	inc 	!lane_arr	
+268.  0C7 017002  	ldx* 	!lane_arr	; store frame offset into XR
+269.  0C8 FFF003  	txa		; increment offset
+270.  0C9 100001  	ada#	1	
+271.  0CA 200026  	cma#	38	; check overflow
+272.  0CB 4A20CD  	jlt	storeInc
+273.  0CC 140026  	sba# 	38	; frame offset = 38 => 0
+274.  0CD 047002  storeInc:	sta* 	!lane_arr	; store new frame offset
+275.  0CE 003002  	lda 	!lane_arr
+276.  0CF 100002  	ada#	2	; update the lane display
+277.  0D0 FFF010  	psha		; appropriate starting address
+278.  0D1 080020  	psh#	BLANK	; char to print in front of car
+279.  0D2 0800A4  	psh#	CAR_CHR	; char to print in back
+280.  0D3 4120D8  	jsr	updateLane
+281.  0D4 120003  	ads#	3
+282.  0D5 FFF014  	popx		; reset registers
+283.  0D6 690000  	fin#	0 
+284.  0D7 FFF040  	rtn
+285.              
+286.              ; 	void	updateLane(var LANE#'s car array, first, second)
+287.              ;	redraws lane from by a 1 frame shift stored in frame offset
+288.              ;	prints first_chr in front of car, and second_chr behind car
+289.              	.equ	car_arr, 4
+290.              	.equ	first_chr, 3
+291.              	.equ	second_chr, 2
+292.  0D8 680000  updateLane:	bgn#	0	; assumes XR has frame offset
+293.  0D9 1B3004  updateCars:	inc 	!car_arr	; begin drawing cars
+294.  0DA 007004  	lda* 	!car_arr	; get length of car
+295.  0DB 042213  	sta	CAR_LENGTH	
+296.  0DC 003003  	lda 	!first_chr
+297.  0DD 718211  	outb&	START_PORT	; draw front of car
+298.  0DE 112213  	adx	CAR_LENGTH	
+299.  0DF 210026  	cmx#	38	; check overflow
+300.  0E0 4A20E2  	jlt	noReset
+301.  0E1 150026  	sbx#	38
+302.  0E2 003002  noReset:	lda 	!second_chr	; clear end of car
+303.  0E3 718211  	outb&	START_PORT
+304.  0E4 1C2212  	dec	CARS_LEFT	; any cars left?
+305.  0E5 4820EC  	jeq	endUpdate	; referenced in drawLane
+306.  0E6 1B3004  	inc 	!car_arr	; get next car position
+307.  0E7 117004  	adx* 	!car_arr
+308.  0E8 210026  	cmx#	38
+309.  0E9 4A20D9  	jlt	updateCars
+310.  0EA 150026  	sbx#	38	
+311.  0EB 4020D9  	jmp	updateCars
+312.  0EC 000006  endUpdate:	lda#	6	; reset cars_left
+313.  0ED 042212  	sta	CARS_LEFT
+314.  0EE 690000  	fin#	0
+315.  0EF FFF040  	rtn
+316.              
+317.              ;	void drawPlayer()
+318.              ;	draws player at PLAYER_PORT
+319.  0F0 680000  drawPlayer:	bgn#	0
+320.  0F1 FFF010  	psha		; save registers
+321.  0F2 FFF011  	pshx 
+322.  0F3 706207  	inb*	PLAYER_PORT	; see if player ran into car
+323.  0F4 2000A4  	cma#	CAR_CHR
+324.  0F5 4820F9  	jeq	startReset	; reset level	
+325.  0F6 000040  alive:	lda#	PLAYER_CHR	; draw player
+326.  0F7 716207  	outb*	PLAYER_PORT
+327.  0F8 4020FA  	jmp	endPlayerDraw
+328.  0F9 4120FE  startReset:	jsr	resetLevel
+329.  0FA FFF014  endPlayerDraw:	popx
+330.  0FB FFF013  	popa		; restore registers
+331.  0FC 690000  	fin#	0	
+332.  0FD FFF040  	rtn
+333.              
+334.              ;	void resetLevel()
+335.              ;	Increments corresponding game variables after player failed to
+336.              ;	complete a level
+337.  0FE 680000  resetLevel:	bgn#	0
+338.  0FF FFF010  	psha
+339.  100 1C220D  	dec	LIVES	; Decrements lives, if 0 game ends
+340.  101 4A21FE  	jlt	ENDGAME
+341.  102 00000D  	lda#	13
+342.  103 042209  	sta	FURTHEST_LANE	; reset furthest lane player reached
+343.  104 000005  	lda#	5
+344.  105 0421FF  	sta	PLAY_DELAY	; reset PLAY_DELAY
+345.  106 000021  	lda#	33
+346.  107 10220D  	ada	LIVES
+347.  108 712314  	outb	CRT_XREG	; remove character representing a life
+348.  109 00000E  	lda#	14
+349.  10A 712315  	outb	CRT_YREG
+350.  10B 000020  	lda#	BLANK
+351.  10C 712317  	outb	CRT_DATA	; draw blank (one less char)
+352.  10D 000028  	lda#	40	; move cursor off screen
+353.  10E 712314  	outb	CRT_XREG
+354.  10F 00220B  	lda	TIME_COUNT	; check if time caused function call (print blank)
+355.  110 200000  	cma#	0
+356.  111 4D2115  	jgt	setBlank	; if time != 0, reset caused from collision
+357.  112 000020  	lda#	BLANK	
+358.  113 716207  	outb*	PLAYER_PORT	; clear player port (car)
+359.  114 402117  	jmp	resetCount
+360.  115 0000A4  setBlank:	lda#	CAR_CHR	; clear player port (time)
+361.  116 716207  	outb* PLAYER_PORT
+362.  117 00001F  resetCount:	lda#	31	; reset time_count to 30
+363.  118 04220B  	sta	TIME_COUNT
+364.  119 0002DA  	lda#	730	; reset mapped/non-mapped player position
+365.  11A 042207  	sta	PLAYER_PORT
+366.  11B 000013  	lda#	19
+367.  11C 042205  	sta	PLAYERX
+368.  11D 00000D  	lda#	13
+369.  11E 042206  	sta	PLAYERY
+370.  11F 000020  	lda#	BLANK	; loads last char with blank
+371.  120 042208  	sta	LAST_CHR
+372.  121 4120F0  	jsr	drawPlayer	; redraw player
+373.  122 FFF013  	popa
+374.  123 690000  	fin#	0
+375.  124 FFF040  	rtn
+376.              
+377.              ;	void nextLevel()
+378.              ;	Generates a more difficult highway to traverse and increases the speed of cars
+379.              ;	Also updates the score (+= time remaining)
+380.  125 680000  nextLevel:	bgn#	0
+381.  126 FFF010  	psha
+382.  127 00000D  	lda#	13
+383.  128 042209  	sta	FURTHEST_LANE	; reset furthest lane player reached
+384.  129 000005  	lda#	5
+385.  12A 0421FF  	sta	PLAY_DELAY	; reset PLAY_DELAY
+386.  12B 002201  	lda	DELAY	; decrease game delay
+387.  12C 142202  	sba	DELAY_OFFSET
+388.  12D 202203  	cma	MIN_DELAY	; minimum delay
+389.  12E 4C2131  	jle	incLevel
+390.  12F 042201  	sta	DELAY	; reset counter of timer
+391.  130 732031  	outw  TIM_VALUE
+392.  131 1B220A  incLevel:	inc	LEVEL	; increment level
+393.  132 00000E  	lda#	14
+394.  133 712315  	outb	CRT_YREG	
+395.  134 000007  	lda#	7
+396.  135 712314  	outb	CRT_XREG
+397.  136 00220A  	lda	LEVEL
+398.  137 412E07  	jsr	PUT_NUM2	; display new level
+399.  138 00220C  	lda	SCORE	; score += time remaining
+400.  139 10220B  	ada	TIME_COUNT
+401.  13A 100032  	ada#	50	; score += 50 (completing level)
+402.  13B 04220C  	sta	SCORE	
+403.  13C 000001  	lda#	1
+404.  13D 712315  	outb	CRT_YREG
+405.  13E 000023  	lda#	35	
+406.  13F 712314  	outb	CRT_XREG
+407.  140 00220C  	lda	SCORE
+408.  141 412E07  	jsr	PUT_NUM2	; print score
+409.  142 000028  	lda#	40	; move cursor off screen
+410.  143 712314  	outb	CRT_XREG
+411.  144 00001F  	lda#	31	; reset time_count to 30
+412.  145 04220B  	sta	TIME_COUNT
+413.  146 0002DA  	lda#	730	; reset mapped/non-mapped player position
+414.  147 042207  	sta	PLAYER_PORT
+415.  148 000013  	lda#	19
+416.  149 042205  	sta	PLAYERX
+417.  14A 00000D  	lda#	13
+418.  14B 042206  	sta	PLAYERY
+419.  14C 000020  	lda#	BLANK	; reset last_chr player was over to be blank
+420.  14D 042208  	sta	LAST_CHR
+421.  14E 4120F0  	jsr	drawPlayer	; redraw player
+422.  14F 412159  	jsr 	clearTraffic	; resets traffic
+423.  150 00220E  	lda	MAX_CAR_SIZE	; increment max car size
+424.  151 100001  	ada#	1
+425.  152 200004  	cma#	4
+426.  153 4D2155  	jgt	sizeCapped
+427.  154 1B220E  	inc	MAX_CAR_SIZE
+428.  155 41205E  sizeCapped:	jsr	makeRoad	; new road
+429.  156 FFF013  	popa
+430.  157 690000  	fin#	0
+431.  158 FFF040  	rtn
+432.              
+433.              ;	void clearTraffic()
+434.              ;	clears all characters from every lane
+435.  159 680000  clearTraffic:	bgn#	0
+436.  15A FFF011  	pshx
+437.  15B 010000  	ldx#	0
+438.  15C 0042B9  clearNext:	lda+	LANES	; loop through all lanes
+439.  15D 042211  	sta	START_PORT	; temp var for start port
+440.  15E 006211  	lda*	START_PORT	; MEM[MEM[LANES + XR]] = start port
+441.  15F 042211  	sta	START_PORT		
+442.  160 412166  	jsr	clearLane	; clear lane	
+443.  161 600009  	aoc#	9	; all lanes made
+444.  162 4A215C  	jlt	clearNext
+445.  163 FFF014  	popx
+446.  164 690000  	fin#	0
+447.  165 FFF040  	rtn
+448.              
+449.              ; 	void clearLane(int port)
+450.              ;	prints 38 blank characters from starting port
+451.  166 680000  clearLane:	bgn#	0
+452.  167 FFF011  	pshx
+453.  168 010000  	ldx#	0
+454.  169 000020  	lda#	BLANK
+455.  16A 718211  clearPort:	outb& START_PORT
+456.  16B 600026  	aoc#	38
+457.  16C 4A216A  	jlt	clearPort
+458.  16D FFF014  	popx
+459.  16E 690000  	fin#	0
+460.  16F FFF040  	rtn
+461.              
+462.              ;	int random(int max) leaves result in accumulator!
+463.              	.equ	random_max, 2
+464.              
+465.  170 680000  random:	bgn#	0
+466.  171 00217A  	lda	seed
+467.  172 180ADB  	mul#	2779
+468.  173 1007CD  	ada#	1997
+469.  174 1A0800      	mod#	2048
+470.  175 04217A      	sta	seed
+471.  176 1B3002      	inc 	!random_max
+472.  177 1A3002      	mod 	!random_max
+473.  178 690000      	fin#	0
+474.  179 FFF040  	rtn
+475.  17A 000008  seed:	.word	8
+476.              
+477.              ; INTERRUPT ROUTINES
+478.  17B FFF010  TIMERISR: 	psha
+479.  17C 0021FF  	lda	PLAY_DELAY	; prevents game from updating
+480.  17D 200002  	cma#	2
+481.  17E 492189  	jne	checkZero	; removes crossy road string
+482.  17F 000007  	lda#	7	; move cursor to middle (safe) lane
+483.  180 712315  	outb	CRT_YREG
+484.  181 00000E  	lda#	14
+485.  182 712314  	outb	CRT_XREG
+486.  183 08000C  	psh#	RESET_LEN	; output reset string
+487.  184 08022E  	psh#	RESET_STR
+488.  185 412E05  	jsr	PUT_STR
+489.  186 120002  	ads#	2
+490.  187 000028  	lda#	40	; remove cursor from screen
+491.  188 712314  	outb	CRT_XREG
+492.  189 200000  checkZero:	cma#	0
+493.  18A 48218D  	jeq	noDelay	
+494.  18B 1C21FF  	dec	PLAY_DELAY
+495.  18C 4021A4  	jmp	resetTimer
+496.  18D 002204  noDelay:	lda	TIME_INC	; no delay
+497.  18E 142201  	sba	DELAY
+498.  18F 4D21A1  	jgt	saveTime	; check if TIME_INC < 0
+499.  190 102200  	ada	RESET_TIME	; resets TIME_INC
+500.  191 042204  	sta	TIME_INC
+501.  192 1C220B  	dec	TIME_COUNT	; dec TIME_COUNT
+502.  193 4F2196  	jno	validTime	; TIME_COUNT = -1, reset level
+503.  194 4120FE  	jsr	resetLevel	
+504.  195 4021A4  	jmp	resetTimer
+505.  196 000001  validTime:	lda#	1	; print new time
+506.  197 712315  	outb	CRT_YREG	; move cursor
+507.  198 000006  	lda#	6	
+508.  199 712314  	outb 	CRT_XREG
+509.  19A 00220B  	lda	TIME_COUNT	
+510.  19B 412E07  	jsr	PUT_NUM2	; blank at end of time, so when
+511.  19C 000020  	lda#	BLANK	; time < 10, there is no extra 0
+512.  19D 712317  	outb	CRT_DATA		
+513.  19E 000028  	lda#	40
+514.  19F 712314  	outb	CRT_XREG	; move cursor off screen
+515.  1A0 4021A4  	jmp	resetTimer
+516.  1A1 042204  saveTime:	sta	TIME_INC
+517.  1A2 412041  	jsr 	drawTraffic	; draw traffic every interrupt
+518.  1A3 4120F0  	jsr	drawPlayer	; draw cursor - detects collision	
+519.  1A4 0000C0  resetTimer:	lda#	ENABLE_AND_RESET	; enable timer, reset count
+520.  1A5 712030            	outb  TIM_CNTL
+521.  1A6 FFF013  	popa
+522.  1A7 FFF041            	irtn
+523.              		
+524.  1A8 FFF010  KEYISR:	psha
+525.  1A9 0021FF  	lda	PLAY_DELAY	; prevents cursor from updating
+526.  1AA 200000  	cma#	0
+527.  1AB 4921F8  	jne	resetKey	; only flushes interrupt
+528.  1AC 000000  	lda#	0
+529.  1AD 712000  	outb	KBD_CNTL	; stop interrupts/no operation
+530.  1AE 702001  	inb	KBD_DATA
+531.  1AF 20006A  	cma#	LEFT
+532.  1B0 4921BC  	jne	rightKey
+533.  1B1 002205  	lda	PLAYERX	; LEFT KEY
+534.  1B2 200001  	cma#	1	; reached left wall?
+535.  1B3 4821F8  	jeq	resetKey
+536.  1B4 002208  	lda	LAST_CHR	; clear player
+537.  1B5 716207  	outb*	PLAYER_PORT
+538.  1B6 1C2205  	dec	PLAYERX	; decrement PORT and PLAYERX
+539.  1B7 1C2207  	dec	PLAYER_PORT
+540.  1B8 706207  	inb*	PLAYER_PORT	; store char overwritten
+541.  1B9 042208  	sta	LAST_CHR
+542.  1BA 4120F0  	jsr	drawPlayer	; draw new position
+543.  1BB 4021F8  	jmp 	resetKey
+544.  1BC 20006B  rightKey:	cma#	RIGHT
+545.  1BD 4921C9  	jne	upKey
+546.  1BE 002205  	lda	PLAYERX	; RIGHT KEY
+547.  1BF 200026  	cma#	38	; reached right wall?
+548.  1C0 4821F8  	jeq	resetKey
+549.  1C1 002208  	lda	LAST_CHR	; clear player
+550.  1C2 716207  	outb*	PLAYER_PORT
+551.  1C3 1B2205  	inc	PLAYERX	; increment PORT and PLAYERX
+552.  1C4 1B2207  	inc	PLAYER_PORT
+553.  1C5 706207  	inb*	PLAYER_PORT	; store char overwritten
+554.  1C6 042208  	sta	LAST_CHR
+555.  1C7 4120F0  	jsr	drawPlayer	; draw new position
+556.  1C8 4021F8  	jmp	resetKey
+557.  1C9 200069  upKey:	cma#	UP
+558.  1CA 4921EA  	jne	downKey
+559.  1CB 002206  	lda	PLAYERY	; UP KEY
+560.  1CC 200003  	cma#	3	; reached end lane? go to NEXT LEVEL
+561.  1CD 4D21D0  	jgt	notNEXT
+562.  1CE 412125  	jsr	nextLevel
+563.  1CF 4021F8  	jmp	resetKey
+564.  1D0 002208  notNEXT:	lda	LAST_CHR	; clear player
+565.  1D1 716207  	outb*	PLAYER_PORT
+566.  1D2 1C2206  	dec	PLAYERY	; decrement PORT and PLAYERY
+567.  1D3 000026  	lda#	38
+568.  1D4 FFF020  	nega
+569.  1D5 102207  	ada	PLAYER_PORT
+570.  1D6 042207  	sta	PLAYER_PORT
+571.  1D7 706207  	inb*	PLAYER_PORT	
+572.  1D8 042208  	sta	LAST_CHR	; store char overwritten
+573.  1D9 002206  	lda	PLAYERY
+574.  1DA 202209  	cma	FURTHEST_LANE
+575.  1DB 4B21E8  	jge	noAddScore
+576.  1DC 1C2209  	dec	FURTHEST_LANE
+577.  1DD 00000A  	lda#	10	; add 10 to score for reaching new line
+578.  1DE 10220C  	ada	SCORE
+579.  1DF 04220C  	sta	SCORE
+580.  1E0 000001  	lda#	1
+581.  1E1 712315  	outb	CRT_YREG
+582.  1E2 000023  	lda#	35	
+583.  1E3 712314  	outb	CRT_XREG
+584.  1E4 00220C  	lda	SCORE
+585.  1E5 412E07  	jsr	PUT_NUM2	; display score
+586.  1E6 000028  	lda#	40
+587.  1E7 712314  	outb	CRT_XREG	; move cursor off screen
+588.  1E8 4120F0  noAddScore:	jsr	drawPlayer	; draw new position
+589.  1E9 4021F8  	jmp	resetKey
+590.  1EA 20006D  downKey:	cma#	DOWN
+591.  1EB 4921F8  	jne	resetKey
+592.  1EC 002206  	lda	PLAYERY	; DOWN KEY
+593.  1ED 20000D  	cma#	13	; at start lane?
+594.  1EE 4821F8  	jeq	resetKey
+595.  1EF 002208  	lda	LAST_CHR	; clear player
+596.  1F0 716207  	outb*	PLAYER_PORT
+597.  1F1 1B2206  	inc	PLAYERY	; increment PORT and PLAYERY
+598.  1F2 000026  	lda#	38	
+599.  1F3 102207  	ada	PLAYER_PORT
+600.  1F4 042207  	sta	PLAYER_PORT
+601.  1F5 706207  	inb*	PLAYER_PORT	; store char overwritten
+602.  1F6 042208  	sta	LAST_CHR
+603.  1F7 4120F0  	jsr	drawPlayer	; draw new position
+604.  1F8 000040  resetKey:	lda#	KBD_FLUSH	; do not want a buffer
+605.  1F9 712000  	outb	KBD_CNTL
+606.  1FA 000080  	lda#	INTERRUPT_ENA	; enable interrups
+607.  1FB 712000  	outb	KBD_CNTL
+608.  1FC FFF013  	popa
+609.  1FD FFF041  	irtn
+610.              
+611.  1FE FFFFFF  ENDGAME:	HLT
+612.              
+613.              ; TIMER VARIABLES
+614.  1FF 000005  PLAY_DELAY:	.word 5
+615.  200 002EE0  RESET_TIME:	.word	12000
+616.  201 0007D0  DELAY:	.word	2000	; delay of timer before reload
+617.  202 0001F4  DELAY_OFFSET:	.word	500	; amount delay decreases per level
+618.  203 000000  MIN_DELAY:	.word 0	; min delay
+619.  204 002EE0  TIME_INC:	.word	12000	; count of timer before incrementing the time
+620.              
+621.              ; PLAYER VARIABLES
+622.  205 000013  PLAYERX:	.word	19	; non-mapped cursor location of player
+623.  206 00000D  PLAYERY:	.word 13
+624.  207 0002DA  PLAYER_PORT:	.word	730	; mapped location of player
+625.  208 000020  LAST_CHR:	.word	BLANK	; last character player was over
+626.              
+627.              ; GAME VARIABLES
+628.  209 00000D  FURTHEST_LANE:	.word	13	; furthest lane a player reached (adds to score)
+629.  20A 000001  LEVEL:	.word	1
+630.  20B 00001E  TIME_COUNT:	.word	30
+631.  20C 000000  SCORE:	.word 0
+632.  20D 000005  LIVES:	.word	5
+633.  20E 000001  MAX_CAR_SIZE:	.word	1	; size is random (1->1+MAX_SIZE)
+634.              
+635.              ; TEMP VARIABLES
+636.  20F 000000  REFRESH_RATE:	.word 0	; mem addr of lane refresh rate
+637.  210 00000F  FRAME_COUNT:	.word 15	; frame count of game
+638.  211 000000  START_PORT:	.word 0	; port address of lane start
+639.  212 000006  CARS_LEFT:	.word 6	; # of cars left to draw
+640.  213 000000  CAR_LENGTH:	.word 0	; length of car
+641.              
+642.              ; ALL THE STRINGS PRINTED TO SCREEN
+643.  214 54494D  TIME_STR:	.char 'TIME:30', TIME_LEN		; displays initial time
+      215 453A33
+      216 302020
+644.  217 53434F  SCORE_STR:	.char	'SCORE:0   ', SCORE_LEN	; displays initial score
+      218 52453A
+      219 302020
+      21A 202020
+645.  21B 2D2D46  FINISH_STR:	.char	'--FINISH--', FINISH_LEN	; writes to end lane
+      21C 494E49
+      21D 53482D
+      21E 2D2020
+646.  21F 43524F  MIDDLE_STR:	.char	'CROSSY ROADS',MID_LEN	; writes to middle lane
+      220 535359
+      221 20524F
+      222 414453
+647.  223 2D2D53  START_STR:	.char	'--ST RT!--', START_LEN	; writes to start lane
+      224 542052
+      225 54212D
+      226 2D2020
+648.  227 4C4556  LEVEL_STR:	.char	'LEVEL:1', LEVEL_LEN	; displays initial level
+      228 454C3A
+      229 312020
+649.  22A 4C4956  LIVES_STR:	.char	'LIVES:\$AE\$AE\$AE\$AE\$AE',LIVES_LEN ; displays initial lives
+      22B 45533A
+      22C AEAEAE
+      22D AEAE20
+      22E 202020
+      22F 202020
+      230 202020
+      231 202020
+      232 00014C
+650.  22E 202020  RESET_STR:	.char	'            ', RESET_LEN; used to remove crossy roads string
+      22F 202020
+      230 202020
+      231 202020
+651.              
+652.  232 00014C  LANE1:	.word	$14C	; LANE DATA STRUCTURE
+653.  233 000000  	.blkw 14, 0	; [0] => start port address	
+654.  241 000172  LANE2:	.word	$172	; [1] => frame offset 
+655.  242 000000  	.blkw 14, 0	; [2] => refresh rate
+656.  250 000198  LANE3:	.word	$198	; [3] => direction
+657.  251 000000  	.blkw 14, 0	;     if [3]>0 lane goes right, and left if otherwise 
+658.  25F 0001BE  LANE4:	.word	$1BE	; [4] => car 1 size
+659.  260 000000  	.blkw 14, 0	; [5] => car 1 gap
+660.  26E 00020A  LANE5:	.word	$20A	; [6] => car 2 size
+661.  26F 000000  	.blkw 14, 0	; [7] => car 2 gap
+662.  27D 000230  LANE6:	.word	$230	; ...
+663.  27E 000000  	.blkw 14, 0	; [14]=> car 6 size
+664.  28C 000256  LANE7:	.word	$256	; 
+665.  28D 000000  	.blkw 14, 0	; car 6 gap is implicit: 38 - sum([3]...[13])
+666.  29B 00027C  LANE8:	.word	$27C	; car size + car gap = 6 or 7
+667.  29C 000000  	.blkw	14, 0
+668.  2AA 0002A2  LANE9:	.word	$2A2
+669.  2AB 000000  	.blkw	14, 0
+670.  2B9 000232  LANES:	.word	LANE1	; LANES ARRAY with LANE addresses
+671.  2BA 000241  	.word	LANE2
+672.  2BB 000250  	.word	LANE3
+673.  2BC 00025F  	.word	LANE4
+674.  2BD 00026E  	.word	LANE5
+675.  2BE 00027D  	.word	LANE6
+676.  2BF 00028C  	.word	LANE7
+677.  2C0 00029B  	.word	LANE8
+678.  2C1 0002AA  	.word	LANE9
+
+                     SYMBOL TABLE CONTENTS
+
+0000F6 = ALIVE           000020 = BLANK           000313 = BOTTOM_RIGHT    
+000212 = CARS_LEFT       000004 = CAR_ARR         0000A4 = CAR_CHR         
+000213 = CAR_LENGTH      000189 = CHECKZERO       000166 = CLEARLANE       
+00015C = CLEARNEXT       00016A = CLEARPORT       000059 = CLEARSTACK      
+000159 = CLEARTRAFFIC    000001 = CLEAR_DISPLAY   00004F = CONTINUE        
+000100 = CRT_BUFFER      000316 = CRT_CNTL        000026 = CRT_COLS        
+000317 = CRT_DATA        00000E = CRT_ROWS        000314 = CRT_XREG        
+000315 = CRT_YREG        000201 = DELAY           000202 = DELAY_OFFSET    
+00005A = DONTUPDATE      00006D = DOWN            0001EA = DOWNKEY         
+00009B = DRAWCAR         000097 = DRAWCARS        00008E = DRAWLANE        
+0000F0 = DRAWPLAYER      000041 = DRAWTRAFFIC     0000C0 = ENABLE_AND_RESET
+0000D0 = ENABLE_RESET_AND_START0000A9 = ENDDRAW         0001FE = ENDGAME         
+0000FA = ENDPLAYERDRAW   0000EC = ENDUPDATE       00000A = FINISH_LEN      
+00021B = FINISH_STR      000003 = FIRST_CHR       000210 = FRAME_COUNT     
+000209 = FURTHEST_LANE   000E01 = GET_NUM         000058 = GOLEFT          
+000004 = HOME            000131 = INCLEVEL        000080 = INTERRUPT_ENA   
+000000 = KBD_CNTL        000001 = KBD_DATA        000040 = KBD_FLUSH       
+000000 = KBD_STAT        0001A8 = KEYISR          000232 = LANE1           
+000241 = LANE2           000250 = LANE3           00025F = LANE4           
+00026E = LANE5           00027D = LANE6           00028C = LANE7           
+00029B = LANE8           0002AA = LANE9           00008A = LANEMADE        
+0002B9 = LANES           000002 = LANE_ARR        000208 = LAST_CHR        
+00006A = LEFT            00020A = LEVEL           000007 = LEVEL_LEN       
+000227 = LEVEL_STR       00020D = LIVES           00000B = LIVES_LEN       
+00022A = LIVES_STR       00000E = MAINLOOP        00007B = MAKECARS        
+000010 = MAKEGAME        000069 = MAKELANE        000060 = MAKENEXT        
+00005E = MAKEROAD        00020E = MAX_CAR_SIZE    00021F = MIDDLE_STR      
+00000C = MID_LEN         000203 = MIN_DELAY       0000AF = MOVELANELEFT    
+0000C2 = MOVELANERIGHT   000049 = NEXTLANE        000125 = NEXTLEVEL       
+0001E8 = NOADDSCORE      00018D = NODELAY         0000E2 = NORESET         
+0001D0 = NOTNEXT         000205 = PLAYERX         000206 = PLAYERY         
+000040 = PLAYER_CHR      000207 = PLAYER_PORT     0001FF = PLAY_DELAY      
+000E08 = PUT_CHR         000E06 = PUT_NL          000E00 = PUT_NUM         
+000E07 = PUT_NUM2        000E05 = PUT_STR         000170 = RANDOM          
+000002 = RANDOM_MAX      00020F = REFRESH_RATE    000117 = RESETCOUNT      
+0001F8 = RESETKEY        0000FE = RESETLEVEL      0001A4 = RESETTIMER      
+00000C = RESET_LEN       000040 = RESET_READY_BIT 00022E = RESET_STR       
+000200 = RESET_TIME      00009F = RESUMEDRAW      00006B = RIGHT           
+0001BC = RIGHTKEY        0001A1 = SAVETIME        00020C = SCORE           
+00000A = SCORE_LEN       000217 = SCORE_STR       000002 = SECOND_CHR      
+00017A = SEED            000115 = SETBLANK        000155 = SIZECAPPED      
+0000F9 = STARTRESET      000010 = START_AFTER_LOAD00000A = START_LEN       
+000211 = START_PORT      000223 = START_STR       0000B7 = STOREDEC        
+000088 = STOREGAP        0000CD = STOREINC        00017B = TIMERISR        
+00020B = TIME_COUNT      000204 = TIME_INC        000007 = TIME_LEN        
+000214 = TIME_STR        000030 = TIM_CNTL        000034 = TIM_COUNT       
+000030 = TIM_STAT        000031 = TIM_VALUE       000069 = UP              
+0000D9 = UPDATECARS      0000D8 = UPDATELANE      0001C9 = UPKEY           
+000196 = VALIDTIME       
