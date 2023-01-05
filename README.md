@@ -9,7 +9,7 @@ It allowed me to make use of an IO mapped IO, and keyboard and timer registers t
 Structure of data: Array of objects (lanes) found at the bottom of the file.
   A lane includes a starting IO port, for which a sequence of cars should be drawn on the IO.
   It also includes a frame offset, which determines how far the car should be draw from its initial location.
-    (Note: width of the IO is 38, so any car location past 0 or 38 will recycle to 38 or 0 respectively)
+    (Note that the width of the IO is 38, so any car location past 0 or 38 will recycle to 38 or 0 respectively).
   Thirdly, a lane will have a refresh rate, which determines how often the lane is redrawn (its speed).
   Also, a lane has a direction of travel (left or right, -1 or 1).
   The rest of the data in the structure is a series of 6 car sizes+gaps (sums to 38).
