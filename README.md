@@ -11,7 +11,7 @@ Structure of data: Array of objects (lanes) found at the bottom of the file.
   It also includes a frame offset, which determines how far the car should be draw from its initial location.
     (Note that the width of the IO is 38, so any car location past 0 or 38 will recycle to 38 or 0 respectively).
   Thirdly, a lane will have a refresh rate, which determines how often the lane is redrawn (its speed).
-  Also, a lane has a direction of travel (left or right, -1 or 1).
+  Also, a lane has a direction of travel (left or right, 0 or 1).
   The rest of the data in the structure is a series of 6 car sizes+gaps (sums to 38).
   
 Another item to note: Car sizes and lane speeds are both randomly generated upon reaching a new level.
