@@ -1,9 +1,9 @@
 # frogger
-Objective: Make you character pass 9 lanes of traffic without collision, and within a certain time.
+Objective: Make your character pass 9 lanes of traffic quickly without collision.
            If a new level is reached, cars will get bigger, and speeds will get faster.
 
 
-Implementation: I used an outdated assembly language called CUSP. CUSP supports 5 registers and 10 easy to use addressing modes. 
+Implementation: I used an assembly language called CUSP. CUSP supports 5 registers and 10 easy to use addressing modes. 
 It allowed me to make use of an IO mapped IO, and keyboard and timer registers to display moving characters on the screen.
 
 Structure of data: Array of objects (lanes) found at the bottom of the file.
