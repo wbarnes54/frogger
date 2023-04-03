@@ -1,4 +1,4 @@
-# frogger
+# Frogger
 Objective: Make your character pass 9 lanes of traffic quickly without collision.
            If a new level is reached, cars will get bigger, and speeds will get faster.
 
