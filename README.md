@@ -21,8 +21,6 @@ That goes for any updating item: player, score, and lives, but the car animation
 
 Score: +10 per new line reached on a level, and +50 (and time remaining) if end of level is reached.
 
-Since CUSP is an outdated environment, I've included my a screenshot of the simulator:
+Since CUSP is an outdated environment, I've a full gameplay below
 
-<img width="616" alt="Screen Shot 2023-04-03 at 3 59 29 PM" src="https://user-images.githubusercontent.com/121517830/229644649-1709121f-a32e-4e03-82f3-8960834411b2.png"><br />
-
-And a full video of gameplay is in the files above.
+https://user-images.githubusercontent.com/121517830/229646225-adc90a77-ae1f-4d39-a3b9-d42157063983.mov
